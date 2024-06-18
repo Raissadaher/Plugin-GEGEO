@@ -1,0 +1,60 @@
+from qgis.core import QgsProject, QgsField, QgsFeature
+from PyQt5.QtCore import QVariant
+
+
+def fill_id_field(layer_name, start, end):
+    layer = QgsProject.instance().mapLayersByName(layer_name)[0]
+
+    if not layer:
+        print("Layer not found!")
+        return
+
+    field_name = "id"  # Nome do campo a ser preenchido
+    start_value = start  # Valor inicial
+    end_value = end  # Valor final
+
+    # Verifica se o campo 'ID' existe, se não existir, cria-o
+    if field_name not in [field.name() for field in layer.fields()]:
+        layer.dataProvider().addAttributes([QgsField(field_name, QVariant.Int)])
+        layer.updateFields()
+
+    # Calcular o número total de feições
+    total_features = layer.featureCount()
+
+    # Certifica-se de que há feições suficientes para o intervalo dado
+    if end_value - start_value + 1 > total_features:
+        print("Intervalo fornecido é maior que o número de feições na camada.")
+        return
+
+    # Tentar iniciar a edição da camada
+    if not layer.isEditable():
+        if not layer.startEditing():
+            print("Não foi possível iniciar a edição da camada.")
+            return
+
+    try:
+        # Ordenar as feições pelo campo 'ID' ou pelo campo geométrico desejado
+        sorted_features = sorted(layer.getFeatures(), key=lambda f: f.id())
+
+        # Preencher o campo 'ID' com valores do intervalo especificado
+        current_value = start_value
+        for feature in sorted_features:
+            if current_value > end_value:
+                break
+            layer.changeAttributeValue(feature.id(), layer.fields().indexFromName(field_name), current_value)
+            current_value += 1
+
+        # Salvar as mudanças e parar a edição
+        if not layer.commitChanges():
+            print("Erro ao salvar as mudanças.")
+    except Exception as e:
+        print(f"Ocorreu um erro: {e}")
+        layer.rollBack()
+
+
+# Exemplo de uso
+layer_name = "Área de supressão em RL"  # Nome da camada
+start_value = 10
+end_value = 21
+
+fill_id_field(layer_name, start_value, end_value)
